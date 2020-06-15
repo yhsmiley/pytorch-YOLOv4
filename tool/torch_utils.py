@@ -303,7 +303,7 @@ def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, only_ob
     bh = bh.view(batch, num_anchors * H * W, 1)
 
     # Shape: [batch, num_anchors * h * w, 1, 4]
-    boxes = torch.cat((bx, by, bw, bh), dim=2).view(batch, num_anchors * H * W, 1, 4)
+    boxes = torch.cat((bx, by, bw.float(), bh.float()), dim=2).view(batch, num_anchors * H * W, 1, 4)
     # Shape: [batch, num_anchors * h * w, num_classes, 4]
     boxes = boxes.repeat([1, 1, num_classes, 1])
 

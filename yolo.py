@@ -7,10 +7,8 @@ import os
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 CWD = os.getcwd()
 if CWD == THIS_DIR:
-    from tool.torch_utils import *
     from tool.darknet2pytorch import Darknet
 else:
-    from pytorch_YOLOv4.tool.torch_utils import *
     from pytorch_YOLOv4.tool.darknet2pytorch import Darknet
 
 
@@ -233,7 +231,7 @@ class YOLOV4(object):
     def _post_processing(self, img, output):
         boxes = []
         for i in range(len(output)):
-            boxes.append(self._get_region_boxes(output[i][0], output[i][1], output[i][2]))
+            boxes.append(self._get_region_boxes(output[i][0], output[i][1]))
 
         if img.shape[0] > 1:
             bboxs_for_imgs = [
@@ -247,17 +245,25 @@ class YOLOV4(object):
 
         return boxes
 
-    def _get_region_boxes(self, boxes, cls_confs, det_confs):
+    def _get_region_boxes(self, boxes, confs):
+        # boxes: [batch, num_anchors * H * W, num_classes, 4]
+        # confs: [batch, num_anchors * H * W, num_classes]
+
+        # [batch, num_anchors * H * W, num_classes, 4] --> [batch, num_anchors * H * W, 4]
+        boxes = boxes[:, :, 0, :]
+
         all_boxes = []
         for b in range(boxes.shape[0]):
             l_boxes = []
-            # Shape: [batch, num_anchors * H * W] -> [num_anchors * H * W]
-            det_conf = det_confs[b, :]
-            argwhere = np.argwhere(det_conf > self.thresh)
-     
-            det_conf = det_conf[argwhere].flatten()
-            max_cls_conf = cls_confs[b, argwhere].max(axis=2).flatten()
-            max_cls_id = cls_confs[b, argwhere].argmax(axis=2).flatten()
+
+            # [num_anchors * H * W, num_classes] --> [num_anchors * H * W]
+            max_conf = confs[b, :, :].max(axis=1)
+            # [num_anchors * H * W, num_classes] --> [num_anchors * H * W]
+            max_id = confs[b, :, :].argmax(axis=1)
+
+            argwhere = np.argwhere(max_conf > self.thresh)
+            max_conf = max_conf[argwhere].flatten()
+            max_id = max_id[argwhere].flatten()
 
             bcx = boxes[b, argwhere, 0]
             bcy = boxes[b, argwhere, 1]
@@ -265,11 +271,10 @@ class YOLOV4(object):
             bh = boxes[b, argwhere, 3]
 
             for i in range(bcx.shape[0]):
-                l_box = [bcx[i], bcy[i], bw[i], bh[i], det_conf[i], max_cls_conf[i], max_cls_id[i]]
+                l_box = [bcx[i], bcy[i], bw[i], bh[i], max_conf[i], max_conf[i], max_id[i]]
                 l_boxes.append(l_box)
 
             all_boxes.append(l_boxes)
-
         return all_boxes
 
     def _nms(self, boxes):
