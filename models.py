@@ -1,7 +1,14 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from tool.yolo_layer import YoloLayer
+
+import os
+THIS_DIR = os.path.dirname(os.path.realpath(__file__))
+CWD = os.getcwd()
+if CWD == THIS_DIR:
+    from tool.yolo_layer import YoloLayer
+else:
+    from pytorch_YOLOv4.tool.yolo_layer import YoloLayer
 
 
 class Mish(torch.nn.Module):

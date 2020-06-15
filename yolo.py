@@ -7,34 +7,38 @@ import os
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 CWD = os.getcwd()
 if CWD == THIS_DIR:
-    from tool.darknet2pytorch import Darknet
+    # from tool.darknet2pytorch import Darknet
+    from models import Yolov4
 else:
-    from pytorch_YOLOv4.tool.darknet2pytorch import Darknet
+    # from pytorch_YOLOv4.tool.darknet2pytorch import Darknet
+    from pytorch_YOLOv4.models import Yolov4
 
 
 class YOLOV4(object):
     if CWD == THIS_DIR:
         _defaults = {
-            "weights": "weights/yolov4.weights",
+            "weights": "weights/yolov4.pth",
             "config": "cfg/yolov4.cfg",
             "classes_path": 'data/coco.names',
             "thresh": 0.5,
             "nms_thresh": 0.4,
             "model_image_size": (608,608),
             "max_batch_size": 4,
+            "half": True
         }
     else:
         _defaults = {
-            "weights": "pytorch_YOLOv4/weights/yolov4.weights",
+            "weights": "pytorch_YOLOv4/weights/yolov4.pth",
             "config": "pytorch_YOLOv4/cfg/yolov4.cfg",
             "classes_path": 'pytorch_YOLOv4/data/coco.names',
             "thresh": 0.5,
             "nms_thresh": 0.4,
             "model_image_size": (608,608),
             "max_batch_size": 4,
+            "half": True
         }
 
-    def __init__(self, bgr=True, gpu_device=0, half=False, **kwargs):
+    def __init__(self, bgr=True, gpu_device=0, **kwargs):
         self.__dict__.update(self._defaults) # set up default values
         # for portability between keras-yolo3/yolo.py and this
         if 'model_path' in kwargs:
@@ -44,15 +48,18 @@ class YOLOV4(object):
         self.__dict__.update(kwargs) # update with user overrides
 
         self.class_names = self._get_class()
-        self.model = Darknet(self.config)
-        self.model.load_weights(self.weights)
+        # self.model = Darknet(self.config)
+        # self.model.load_weights(self.weights)
+        self.model = Yolov4(n_classes=len(self.class_names), yolo_layer_included=True)
+        checkpoint = torch.load(self.weights, map_location=torch.device('cpu'))
+        # checkpoint = self._rename_checkpoint(checkpoint)
+        self.model.load_state_dict(checkpoint)
 
         self.device = gpu_device
         self.model.cuda(self.device)
         self.model.eval()
 
         self.bgr = bgr
-        self.half = half
 
         if self.half:
             self.model.half()
@@ -66,6 +73,14 @@ class YOLOV4(object):
             class_names = f.readlines()
         class_names = [c.strip() for c in class_names]
         return class_names
+
+    def _rename_checkpoint(self, checkpoint):
+        checkpoint_copy = copy.deepcopy(checkpoint)
+        for key in checkpoint:
+            if 'neek' in key:
+                key_new = key.replace('neek', 'neck')
+                checkpoint_copy[key_new] = checkpoint_copy.pop(key)
+        return checkpoint_copy
 
     def _detect(self, list_of_imgs):
         inputs = []
@@ -231,7 +246,7 @@ class YOLOV4(object):
     def _post_processing(self, img, output):
         boxes = []
         for i in range(len(output)):
-            boxes.append(self._get_region_boxes(output[i][0], output[i][1]))
+            boxes.append(self._get_region_boxes(output[i][0], output[i][1], output[i][2]))
 
         if img.shape[0] > 1:
             bboxs_for_imgs = [
@@ -245,25 +260,17 @@ class YOLOV4(object):
 
         return boxes
 
-    def _get_region_boxes(self, boxes, confs):
-        # boxes: [batch, num_anchors * H * W, num_classes, 4]
-        # confs: [batch, num_anchors * H * W, num_classes]
-
-        # [batch, num_anchors * H * W, num_classes, 4] --> [batch, num_anchors * H * W, 4]
-        boxes = boxes[:, :, 0, :]
-
+    def _get_region_boxes(self, boxes, cls_confs, det_confs):
         all_boxes = []
         for b in range(boxes.shape[0]):
             l_boxes = []
-
-            # [num_anchors * H * W, num_classes] --> [num_anchors * H * W]
-            max_conf = confs[b, :, :].max(axis=1)
-            # [num_anchors * H * W, num_classes] --> [num_anchors * H * W]
-            max_id = confs[b, :, :].argmax(axis=1)
-
-            argwhere = np.argwhere(max_conf > self.thresh)
-            max_conf = max_conf[argwhere].flatten()
-            max_id = max_id[argwhere].flatten()
+            # Shape: [batch, num_anchors * H * W] -> [num_anchors * H * W]
+            det_conf = det_confs[b, :]
+            argwhere = np.argwhere(det_conf > self.thresh)
+     
+            det_conf = det_conf[argwhere].flatten()
+            max_cls_conf = cls_confs[b, argwhere].max(axis=2).flatten()
+            max_cls_id = cls_confs[b, argwhere].argmax(axis=2).flatten()
 
             bcx = boxes[b, argwhere, 0]
             bcy = boxes[b, argwhere, 1]
@@ -271,10 +278,11 @@ class YOLOV4(object):
             bh = boxes[b, argwhere, 3]
 
             for i in range(bcx.shape[0]):
-                l_box = [bcx[i], bcy[i], bw[i], bh[i], max_conf[i], max_conf[i], max_id[i]]
+                l_box = [bcx[i], bcy[i], bw[i], bh[i], det_conf[i], max_cls_conf[i], max_cls_id[i]]
                 l_boxes.append(l_box)
 
             all_boxes.append(l_boxes)
+
         return all_boxes
 
     def _nms(self, boxes):

@@ -170,13 +170,13 @@ def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anch
     bxy[:, :, 0] += grid_x_tensor
     bxy[:, :, 1] += grid_y_tensor
 
-    print(anchor_tensor.size())
+    # print(anchor_tensor.size())
     bwh *= anchor_tensor
 
     # Shape: [batch, num_anchors, 4, H * W] --> [batch, num_anchors * H * W, 4]
     boxes = torch.cat((bxy, bwh), dim=2).permute(0, 1, 3, 2).reshape(batch, num_anchors * H * W, 4)
 
-    print(normal_tensor.size())
+    # print(normal_tensor.size())
     boxes *= normal_tensor
 
 
@@ -268,8 +268,10 @@ def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, only_ob
         by = bxy[:, ii + 1] + torch.tensor(grid_y, device=device, dtype=torch.float32) # grid_y.to(device=device, dtype=torch.float32)
         # Shape: [batch, 1, H, W]
         bw = bwh[:, ii] * anchor_w[i]
+        bw = bw.float()
         # Shape: [batch, 1, H, W]
         bh = bwh[:, ii + 1] * anchor_h[i]
+        bh = bh.float()
 
         bx_list.append(bx)
         by_list.append(by)
@@ -303,7 +305,7 @@ def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, only_ob
     bh = bh.view(batch, num_anchors * H * W, 1)
 
     # Shape: [batch, num_anchors * h * w, 1, 4]
-    boxes = torch.cat((bx, by, bw.float(), bh.float()), dim=2).view(batch, num_anchors * H * W, 1, 4)
+    boxes = torch.cat((bx, by, bw, bh), dim=2).view(batch, num_anchors * H * W, 1, 4)
     # Shape: [batch, num_anchors * h * w, num_classes, 4]
     boxes = boxes.repeat([1, 1, num_classes, 1])
 
