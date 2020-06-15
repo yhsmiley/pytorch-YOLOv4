@@ -1,5 +1,13 @@
 import torch
-from tool.torch_utils import convert2cpu
+
+import os
+from pathlib import Path
+yolov4_DIR = Path(os.path.dirname(os.path.realpath(__file__))).parent
+CWD = os.getcwd()
+if CWD == str(yolov4_DIR):
+    from tool.torch_utils import convert2cpu
+else:
+    from pytorch_YOLOv4.tool.torch_utils import convert2cpu
 
 
 def parse_cfg(cfgfile):

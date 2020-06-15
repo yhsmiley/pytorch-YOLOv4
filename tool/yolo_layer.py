@@ -1,6 +1,14 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from tool.torch_utils import *
+
+import os
+from pathlib import Path
+yolov4_DIR = Path(os.path.dirname(os.path.realpath(__file__))).parent
+CWD = os.getcwd()
+if CWD == str(yolov4_DIR):
+    from tool.torch_utils import *
+else:
+    from pytorch_YOLOv4.tool.torch_utils import *
 
 
 def build_targets(pred_boxes, target, anchors, num_anchors, num_classes, nH, nW, noobject_scale, object_scale,

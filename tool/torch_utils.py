@@ -11,7 +11,14 @@ import itertools
 import struct  # get_image_size
 import imghdr  # get_image_size
 
-from tool import utils 
+import os
+from pathlib import Path
+yolov4_DIR = Path(os.path.dirname(os.path.realpath(__file__))).parent
+CWD = os.getcwd()
+if CWD == str(yolov4_DIR):
+    from tool import utils
+else:
+    from pytorch_YOLOv4.tool import utils
 
 
 def bbox_ious(boxes1, boxes2, x1y1x2y2=True):

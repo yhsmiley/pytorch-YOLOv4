@@ -1,9 +1,19 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from tool.region_loss import RegionLoss
-from tool.yolo_layer import YoloLayer
-from tool.config import *
+
+import os
+from pathlib import Path
+yolov4_DIR = Path(os.path.dirname(os.path.realpath(__file__))).parent
+CWD = os.getcwd()
+if CWD == str(yolov4_DIR):
+    from tool.region_loss import RegionLoss
+    from tool.yolo_layer import YoloLayer
+    from tool.config import *
+else:
+    from pytorch_YOLOv4.tool.region_loss import RegionLoss
+    from pytorch_YOLOv4.tool.yolo_layer import YoloLayer
+    from pytorch_YOLOv4.tool.config import *
 
 
 class Mish(torch.nn.Module):
@@ -261,7 +271,7 @@ class Darknet(nn.Module):
                 elif activation == 'mish':
                     model.add_module('mish{0}'.format(conv_id), Mish())
                 else:
-                    print("convalution havn't activate {}".format(activation))
+                    print("convolution havn't activate {}".format(activation))
 
                 prev_filters = filters
                 out_filters.append(prev_filters)
