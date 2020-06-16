@@ -83,22 +83,15 @@ class YOLOV4(object):
         return checkpoint_copy
 
     def _detect(self, list_of_imgs):
-        inputs = []
-        for img in list_of_imgs:
-            if self.bgr:
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                # print('bgr: {}'.format(img.shape))
-            # print('size: {}'.format(self.model_image_size))
-            image = cv2.resize(img, self.model_image_size)
-            # print('image: {}'.format(image.shape))
-            inputs.append(np.expand_dims(np.array(image), axis=0))
+        if self.bgr:
+            list_of_imgs = [ cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in list_of_imgs ]
 
-        images = np.concatenate(inputs, 0)
+        resized = [np.array(cv2.resize(img, self.model_image_size)) for img in list_of_imgs]
+        images = np.stack(resized, axis=0)
+        images = np.divide(images, 255, dtype=np.float32)
+        images = torch.from_numpy(images.transpose(0, 3, 1, 2))
 
-        # print('images: {}'.format(images.shape))
-        images = torch.from_numpy(images.transpose(0, 3, 1, 2)).float().div(255.0)
-
-        images = images.cuda()
+        images = images.cuda(self.device)
         images = torch.autograd.Variable(images)
 
         if self.half:
@@ -112,20 +105,16 @@ class YOLOV4(object):
         feature_list = []
         with torch.no_grad():
             for batch in batches:
-                img = batch.cuda(self.device)
-                features = self.model(img)
+                features = self.model(batch)
 
                 # feature_list = [(t, t, t), (t, t, t), (t, t, t)]
                 # features = [(t, t, t), (t, t, t), (t, t, t)]
                 if not feature_list:
                     feature_list = features
                 else:
-                    def feat_cat(feat_list_tup, feat_tup):
-                        return map(lambda x, y: torch.cat((x, y)), feat_list_tup, feat_tup)
+                    feature_list = [[torch.cat(feat) for feat in zip(feat_tup)] for feat_tup in zip(feature_list, features)]
 
-                    feature_list = map(lambda x, y: feat_cat(x, y), feature_list, features)
-
-        output = [[feat.data.cpu().numpy() for feat in feature] for feature in feature_list]
+        output = [[feat.cpu().numpy() for feat in feat_tup] for feat_tup in feature_list]
 
         return self._post_processing(images, output)
 
