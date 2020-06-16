@@ -50,7 +50,7 @@ class YOLOV4(object):
         self.class_names = self._get_class()
         # self.model = Darknet(self.config)
         # self.model.load_weights(self.weights)
-        self.model = Yolov4(n_classes=len(self.class_names), yolo_layer_included=True)
+        self.model = Yolov4(n_classes=len(self.class_names), inference=True)
         checkpoint = torch.load(self.weights, map_location=torch.device('cpu'))
         # checkpoint = self._rename_checkpoint(checkpoint)
         self.model.load_state_dict(checkpoint)
