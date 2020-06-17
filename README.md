@@ -27,13 +27,13 @@ A minimal PyTorch implementation of YOLOv4.
 ├── data            
 ├── weight                --> darknet2pytorch
 ├── tool
-│   ├── camera.py           a demo camera
-│   ├── coco_annotatin.py       coco dataset generator
-│   ├── config.py
-│   ├── darknet2pytorch.py
-│   ├── region_loss.py
-│   ├── utils.py
-│   └── yolo_layer.py
+│   ├── camera.py           a demo camera
+│   ├── coco_annotatin.py       coco dataset generator
+│   ├── config.py
+│   ├── darknet2pytorch.py
+│   ├── region_loss.py
+│   ├── utils.py
+│   └── yolo_layer.py
 ```
 
 ![image](https://user-gold-cdn.xitu.io/2020/4/26/171b5a6c8b3bd513?w=768&h=576&f=jpeg&s=78882)
@@ -76,19 +76,43 @@ you can use darknet2pytorch to convert it yourself, or download my converted mod
      python train.py -g [GPU_ID] -dir [Dataset direction] ...
     ```
 
-# 2. Inference
+# 2. Inference (Evolving)
 
-- Load the pretrained darknet model and darknet weights to do the inference
+- Image input size for inference
 
-```sh
-python demo.py -cfgfile <cfgFile> -weightfile <weightFile> -imgfile <imgFile>
-```
+    Image input size is NOT restricted in `320 * 320`, `416 * 416`, `512 * 512` and `608 * 608`.
+    You can adjust your input sizes for a different input ratio, for example: `320 * 608`.
+    Larger input size could help detect smaller targets, but may be slower and GPU memory exhausting.
 
-- Load pytorch weights (pth file) to do the inference
+    ```py
+    height = 320 + 96 * n, n in {0, 1, 2, 3, ...}
+    width  = 320 + 96 * m, m in {0, 1, 2, 3, ...}
+    ```
 
-```sh
-python models.py <num_classes> <weightfile> <imgfile> <namefile(optional)>
-```
+- **Different inference options**
+
+    - Load the pretrained darknet model and darknet weights to do the inference (image size is configured in cfg file already)
+
+        ```sh
+        python demo.py -cfgfile <cfgFile> -weightfile <weightFile> -imgfile <imgFile>
+        ```
+
+    - Load pytorch weights (pth file) to do the inference
+
+        ```sh
+        python models.py <num_classes> <weightfile> <imgfile> <IN_IMAGE_H> <IN_IMAGE_W> <namefile(optional)>
+        ```
+    
+    - Load converted ONNX file to do inference (See section 3 and 4)
+
+    - Load converted TensorRT engine file to do inference (See section 5)
+
+- Inference output
+
+    Inference output is of shape `[batch, num_boxes, 4 + num_classes]` in which `[batch, num_boxes, 4]` is x_center, y_center, width, height of bounding boxes, and `[batch, num_boxes, num_classes]` is confidences of bounding box for all classes.
+
+    Until now, still a small piece of post-processing including NMS is required. We are trying to minimize time and complexity of post-processing.
+
 
 
 # 3. Darknet2ONNX (Evolving)
@@ -103,13 +127,13 @@ python models.py <num_classes> <weightfile> <imgfile> <namefile(optional)>
     pip install onnxruntime
     ```
 
-- **Run python script to generate onnx model and run the demo**
+- **Run python script to generate ONNX model and run the demo**
 
     ```sh
     python demo_darknet2onnx.py <cfgFile> <weightFile> <imageFile> <batchSize>
     ```
 
-  This script will generate 2 onnx models.
+  This script will generate 2 ONNX models.
 
   - One is for running the demo (batch_size=1)
   - The other one is what you want to generate (batch_size=batchSize)
@@ -126,7 +150,7 @@ python models.py <num_classes> <weightfile> <imgfile> <namefile(optional)>
     pip install onnxruntime
     ```
 
-- **Run python script to generate onnx model and run the demo**
+- **Run python script to generate ONNX model and run the demo**
 
     ```sh
     python demo_pytorch2onnx.py <weight_file> <image_path> <batch_size> <n_classes> <IN_IMAGE_H> <IN_IMAGE_W>
@@ -138,7 +162,7 @@ python models.py <num_classes> <weightfile> <imgfile> <namefile(optional)>
     python demo_pytorch2onnx.py yolov4.pth dog.jpg 8 80 416 416
     ```
 
-  This script will generate 2 onnx models.
+  This script will generate 2 ONNX models.
 
   - One is for running the demo (batch_size=1)
   - The other one is what you want to generate (batch_size=batch_size)
@@ -148,7 +172,7 @@ python models.py <num_classes> <weightfile> <imgfile> <namefile(optional)>
 
 - **TensorRT version Recommended: 7.0, 7.1**
 
-- **Run the following command to convert VOLOv4 onnx model into TensorRT engine**
+- **Run the following command to convert VOLOv4 ONNX model into TensorRT engine**
 
     ```sh
     trtexec --onnx=<onnx_file> --explicitBatch --saveEngine=<tensorRT_engine_file> --workspace=<size_in_megabytes> --fp16
@@ -160,8 +184,8 @@ python models.py <num_classes> <weightfile> <imgfile> <namefile(optional)>
     ```sh
     python demo_trt.py <tensorRT_engine_file> <input_image> <input_H> <input_W>
     ```
-    - Note1: input_H and input_W should agree with the input size in the original darknet cfg file as well as the latter onnx file.
-    - Note2: extra NMS operations are needed for the tensorRT output. This demo uses TianXiaomo's NMS code from `tool/utils.py`.
+    - Note1: input_H and input_W should agree with the input size in the original ONNX file.
+    - Note2: extra NMS operations are needed for the tensorRT output. This demo uses python NMS code from `tool/utils.py`.
 
 
 # 6. ONNX2Tensorflow
