@@ -6,8 +6,10 @@ import os
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 CWD = os.getcwd()
 if CWD == THIS_DIR:
+    from tool.torch_utils import *
     from tool.yolo_layer import YoloLayer
 else:
+    from pytorch_YOLOv4.tool.torch_utils import *
     from pytorch_YOLOv4.tool.yolo_layer import YoloLayer
 
 
@@ -403,7 +405,7 @@ class Yolov4Head(nn.Module):
             y2 = self.yolo2(x10)
             y3 = self.yolo3(x18)
 
-            return [y1, y2, y3]
+            return get_region_boxes([y1, y2, y3])
         
         else:
             return [x2, x10, x18]
@@ -471,10 +473,28 @@ if __name__ == "__main__":
         print('Usage: ')
         print('  python models.py num_classes weightfile imgfile namefile')
 
-    model = Yolov4(n_classes=n_classes, inference=True)
+    model = Yolov4(yolov4conv137weight=None, n_classes=n_classes, inference=True)
 
     pretrained_dict = torch.load(weightfile, map_location=torch.device('cuda'))
     model.load_state_dict(pretrained_dict)
+
+    use_cuda = True
+    if use_cuda:
+        model.cuda()
+
+    img = cv2.imread(imgfile)
+
+    # Inference input size is 416*416 does not mean training size is the same
+    # Training size could be 608*608 or even other sizes
+    sized = cv2.resize(img, (416, 416))
+    sized = cv2.cvtColor(sized, cv2.COLOR_BGR2RGB)
+
+    from tool.utils import load_class_names, plot_boxes_cv2
+    from tool.torch_utils import do_detect
+
+    for i in range(2):  # This 'for' loop is for speed check
+                        # Because the first iteration is usually longer
+        boxes = do_detect(model, sized, 0.4, 0.6, use_cuda)
 
     if namesfile == None:
         if n_classes == 20:
@@ -484,18 +504,5 @@ if __name__ == "__main__":
         else:
             print("please give namefile")
 
-    use_cuda = True
-    if use_cuda:
-        model.cuda()
-
-    img = cv2.imread(imgfile)
-    sized = cv2.resize(img, (608, 608))
-    sized = cv2.cvtColor(sized, cv2.COLOR_BGR2RGB)
-
-    from tool.utils import load_class_names, plot_boxes_cv2
-    from tool.torch_utils import do_detect
-
-    boxes = do_detect(model, sized, 0.5, n_classes, 0.4, use_cuda)
-
     class_names = load_class_names(namesfile)
-    plot_boxes_cv2(img, boxes, 'predictions.jpg', class_names)
+    plot_boxes_cv2(img, boxes[0], 'predictions.jpg', class_names)

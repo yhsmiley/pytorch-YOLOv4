@@ -10,10 +10,12 @@ if CWD == str(yolov4_DIR):
     from tool.region_loss import RegionLoss
     from tool.yolo_layer import YoloLayer
     from tool.config import *
+    from tool.torch_utils import *
 else:
     from pytorch_YOLOv4.tool.region_loss import RegionLoss
     from pytorch_YOLOv4.tool.yolo_layer import YoloLayer
     from pytorch_YOLOv4.tool.config import *
+    from pytorch_YOLOv4.tool.torch_utils import *
 
 
 class Mish(torch.nn.Module):
@@ -226,10 +228,11 @@ class Darknet(nn.Module):
                 continue
             else:
                 print('unknown type %s' % (block['type']))
+        
         if self.training:
-            return loss
+            return self.loss
         else:
-            return out_boxes
+            return get_region_boxes(out_boxes)
 
     def print_network(self):
         print_cfg(self.blocks)
@@ -396,6 +399,7 @@ class Darknet(nn.Module):
                 yolo_layer.anchor_mask = [int(i) for i in anchor_mask]
                 yolo_layer.anchors = [float(i) for i in anchors]
                 yolo_layer.num_classes = int(block['classes'])
+                self.num_classes = yolo_layer.num_classes
                 yolo_layer.num_anchors = int(block['num'])
                 yolo_layer.anchor_step = len(yolo_layer.anchors) // yolo_layer.num_anchors
                 yolo_layer.stride = prev_stride
