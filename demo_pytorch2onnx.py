@@ -34,6 +34,19 @@ def transform_to_onnx(weight_file, batch_size, n_classes, IN_IMAGE_H, IN_IMAGE_W
                       # input_names=['input'], output_names=['output_1', 'output_2', 'output_3'],
                       dynamic_axes=None)
 
+    # Dynamic Shape
+    # torch.onnx.export(model,
+    #                   x,
+    #                   onnx_file_name,
+    #                   export_params=True,
+    #                   opset_version=11,
+    #                   do_constant_folding=True,
+    #                   # input_names=['input'], output_names=['output_1', 'output_2', 'output_3'],
+    #                   input_names = ['input'],   # the model's input names
+    #                   output_names = ['output'], # the model's output names
+    #                   dynamic_axes={'input' : {0: 'batch_size'},
+    #                                 'output' : {0: 'batch_size'}})
+
     print('Onnx model exporting done')
     return onnx_file_name
     
@@ -46,6 +59,7 @@ def main(weight_file, image_path, batch_size, n_classes, IN_IMAGE_H, IN_IMAGE_W)
     # Transform to onnx for demo
     onnx_path_demo = transform_to_onnx(weight_file, 1, n_classes, IN_IMAGE_H, IN_IMAGE_W)
 
+    # onnx_path_demo = "yolov4_1_3_608_608.onnx"
     session = onnxruntime.InferenceSession(onnx_path_demo)
     # session = onnx.load(onnx_path)
     print("The model expects input shape: ", session.get_inputs()[0].shape)
