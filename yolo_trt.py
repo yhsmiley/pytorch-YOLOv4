@@ -76,13 +76,13 @@ class YOLOV4(object):
 
     # Allocates all buffers required for an engine, i.e. host/device inputs/outputs.
     @staticmethod
-    def allocate_buffers(engine, batch_size=1):
+    def allocate_buffers(engine):
         inputs = []
         outputs = []
         bindings = []
         stream = cuda.Stream()
         for binding in engine:
-            size = trt.volume(engine.get_binding_shape(binding)) * batch_size
+            size = trt.volume(engine.get_binding_shape(binding))
             dtype = trt.nptype(engine.get_binding_dtype(binding))
             # Allocate host and device buffers
             host_mem = cuda.pagelocked_empty(size, dtype)
@@ -128,14 +128,14 @@ class YOLOV4(object):
 
         feature_list = []
         for batch in batches:
-            bs = len(batch)
-            self.trt_buffers = self.allocate_buffers(self.trt_engine, batch_size=bs)
+            self.trt_buffers = self.allocate_buffers(self.trt_engine)
             inputs, outputs, bindings, stream = self.trt_buffers
             inputs[0].host = batch
 
             trt_outputs = self.trt_inference(self.trt_context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
+            # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
             features = trt_outputs[0].reshape(-1, 22743, 4 + len(self.class_names))
-            features = features[:bs]
+            features = features[:len(batch)]
 
             feature_list.append(features)
 

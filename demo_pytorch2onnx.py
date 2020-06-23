@@ -31,21 +31,7 @@ def transform_to_onnx(weight_file, batch_size, n_classes, IN_IMAGE_H, IN_IMAGE_W
                       export_params=True,
                       opset_version=11,
                       do_constant_folding=True,
-                      # input_names=['input'], output_names=['output_1', 'output_2', 'output_3'],
                       dynamic_axes=None)
-
-    # Dynamic Shape
-    # torch.onnx.export(model,
-    #                   x,
-    #                   onnx_file_name,
-    #                   export_params=True,
-    #                   opset_version=11,
-    #                   do_constant_folding=True,
-    #                   # input_names=['input'], output_names=['output_1', 'output_2', 'output_3'],
-    #                   input_names = ['input'],   # the model's input names
-    #                   output_names = ['output'], # the model's output names
-    #                   dynamic_axes={'input' : {0: 'batch_size'},
-    #                                 'output' : {0: 'batch_size'}})
 
     print('Onnx model exporting done')
     return onnx_file_name

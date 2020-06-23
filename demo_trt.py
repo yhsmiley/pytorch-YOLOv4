@@ -8,6 +8,7 @@ import cv2
 import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.autoinit
+from time import perf_counter
 
 from tool.utils import *
 
@@ -73,14 +74,13 @@ class HostDeviceMem(object):
         return self.__str__()
 
 # Allocates all buffers required for an engine, i.e. host/device inputs/outputs.
-def allocate_buffers(engine, batch_size):
+def allocate_buffers(engine):
     inputs = []
     outputs = []
     bindings = []
     stream = cuda.Stream()
     for binding in engine:
-        # size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size
-        size = trt.volume(engine.get_binding_shape(binding)) * batch_size
+        size = trt.volume(engine.get_binding_shape(binding))
         dtype = trt.nptype(engine.get_binding_dtype(binding))
         # Allocate host and device buffers
         host_mem = cuda.pagelocked_empty(size, dtype)
@@ -119,9 +119,16 @@ def main(engine_path, image_path, image_size, img_bs):
 
         num_classes = 80
 
-        for i in range(2):  # This 'for' loop is for speed check
-                            # Because the first iteration is usually longer
+        n = 10
+        dur = 0
+        for i in range(n):
+            tic = perf_counter()
             boxes = detect(engine, context, image_src_batch, image_size, num_classes)
+            # print('boxes: {}'.format(boxes))
+            toc = perf_counter()
+            if i != 0:
+                dur += toc - tic
+        print('Average time taken: {:0.3f}s'.format(dur/(n-1)))
 
         if num_classes == 20:
             namesfile = 'data/voc.names'
@@ -161,13 +168,14 @@ def detect(engine, context, image_src_batch, image_size, num_classes):
 
     trt_output_list = []
     for batch in batches:
-        trt_buffers = allocate_buffers(engine, batch_size=len(batch))
+        trt_buffers = allocate_buffers(engine)
         inputs, outputs, bindings, stream = trt_buffers
         inputs[0].host = batch
 
         trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
         print('Len of outputs: ', len(trt_outputs))
 
+        # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
         trt_output = trt_outputs[0].reshape(-1, 22743, 4 + num_classes)
         print('trt output shape: {}'.format(trt_output.shape))
         trt_output = trt_output[:len(batch)]
