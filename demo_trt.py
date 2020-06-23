@@ -73,13 +73,14 @@ class HostDeviceMem(object):
         return self.__str__()
 
 # Allocates all buffers required for an engine, i.e. host/device inputs/outputs.
-def allocate_buffers(engine):
+def allocate_buffers(engine, batch_size):
     inputs = []
     outputs = []
     bindings = []
     stream = cuda.Stream()
     for binding in engine:
-        size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size
+        # size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size
+        size = trt.volume(engine.get_binding_shape(binding)) * batch_size
         dtype = trt.nptype(engine.get_binding_dtype(binding))
         # Allocate host and device buffers
         host_mem = cuda.pagelocked_empty(size, dtype)
@@ -95,11 +96,11 @@ def allocate_buffers(engine):
 
 # This function is generalized for multiple inputs/outputs.
 # inputs and outputs are expected to be lists of HostDeviceMem objects.
-def do_inference(context, bindings, inputs, outputs, stream, batch_size=1):
+def do_inference(context, bindings, inputs, outputs, stream):
     # Transfer input data to the GPU.
     [cuda.memcpy_htod_async(inp.device, inp.host, stream) for inp in inputs]
     # Run inference.
-    context.execute_async(batch_size=batch_size, bindings=bindings, stream_handle=stream.handle)
+    context.execute_async(bindings=bindings, stream_handle=stream.handle)
     # Transfer predictions back from the GPU.
     [cuda.memcpy_dtoh_async(out.host, out.device, stream) for out in outputs]
     # Synchronize the stream
@@ -107,19 +108,20 @@ def do_inference(context, bindings, inputs, outputs, stream, batch_size=1):
     # Return only the host outputs.
     return [out.host for out in outputs]
 
-
 TRT_LOGGER = trt.Logger()
 
-def main(engine_path, image_path, image_size):
+def main(engine_path, image_path, image_size, img_bs):
     with get_engine(engine_path) as engine, engine.create_execution_context() as context:
-        buffers = allocate_buffers(engine)
         image_src = cv2.imread(image_path)
+        image_src_batch = [ image_src for _ in range(img_bs) ]
+
+        print('engine max batch size: {}'.format(engine.max_batch_size))
 
         num_classes = 80
 
         for i in range(2):  # This 'for' loop is for speed check
                             # Because the first iteration is usually longer
-            boxes = detect(engine, context, buffers, image_src, image_size, num_classes)
+            boxes = detect(engine, context, image_src_batch, image_size, num_classes)
 
         if num_classes == 20:
             namesfile = 'data/voc.names'
@@ -131,51 +133,59 @@ def main(engine_path, image_path, image_size):
         class_names = load_class_names(namesfile)
         plot_boxes_cv2(image_src, boxes[0], savename='predictions_trt.jpg', class_names=class_names)
 
-
 def get_engine(engine_path):
     # If a serialized engine exists, use it instead of building an engine.
     print("Reading engine from file {}".format(engine_path))
     with open(engine_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
         return runtime.deserialize_cuda_engine(f.read())
 
-
-
-def detect(engine, context, buffers, image_src, image_size, num_classes):
+def detect(engine, context, image_src_batch, image_size, num_classes):
     IN_IMAGE_H, IN_IMAGE_W = image_size
 
     ta = time.time()
     # Input
-    resized = cv2.resize(image_src, (IN_IMAGE_W, IN_IMAGE_H), interpolation=cv2.INTER_LINEAR)
-    img_in = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
-    img_in = np.transpose(img_in, (2, 0, 1)).astype(np.float32)
-    img_in = np.expand_dims(img_in, axis=0)
-    img_in /= 255.0
+    image_src_batch = [ cv2.cvtColor(img, cv2.COLOR_BGR2RGB) for img in image_src_batch ]
+    resized = [np.array(cv2.resize(img, (IN_IMAGE_W, IN_IMAGE_H), interpolation=cv2.INTER_LINEAR)) for img in image_src_batch]
+    img_in = np.stack(resized, axis=0)
+    img_in = np.divide(img_in, 255, dtype=np.float32)
+    img_in = np.transpose(img_in, (0, 3, 1, 2)).astype(np.float32)
     img_in = np.ascontiguousarray(img_in)
-    print("Shape of the network input: ", img_in.shape)
+
+    print("Shape of the input image batch: ", img_in.shape)
     # print(img_in)
 
-    inputs, outputs, bindings, stream = buffers
-    print('Length of inputs: ', len(inputs))
-    inputs[0].host = img_in
+    batches = []
+    for i in range(0, len(img_in), engine.max_batch_size):
+        these_imgs = img_in[i:i+engine.max_batch_size]
+        batches.append(these_imgs)
 
-    trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
+    trt_output_list = []
+    for batch in batches:
+        trt_buffers = allocate_buffers(engine, batch_size=len(batch))
+        inputs, outputs, bindings, stream = trt_buffers
+        inputs[0].host = batch
 
-    print('Len of outputs: ', len(trt_outputs))
+        trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
+        print('Len of outputs: ', len(trt_outputs))
 
-    trt_output = trt_outputs[0].reshape(1, -1, 4 + num_classes)
+        trt_output = trt_outputs[0].reshape(-1, 22743, 4 + num_classes)
+        print('trt output shape: {}'.format(trt_output.shape))
+        trt_output = trt_output[:len(batch)]
+        trt_output_list.append(trt_output)
+
+    trt_output_list = np.concatenate(trt_output_list, axis=0)
 
     tb = time.time()
 
-    print(trt_output.shape)
+    print('trt shape: {}'.format(trt_output_list.shape))
 
     print('-----------------------------------')
     print('    TRT inference time: %f' % (tb - ta))
     print('-----------------------------------')
 
-    boxes = post_processing(img_in, 0.4, 0.6, trt_output)
+    boxes = post_processing(img_in, 0.5, 0.4, trt_output_list)
 
     return boxes
-
 
 
 if __name__ == '__main__':
@@ -184,9 +194,12 @@ if __name__ == '__main__':
     
     if len(sys.argv) < 4:
         image_size = (416, 416)
+        img_bs = 5
     elif len(sys.argv) < 5:
         image_size = (int(sys.argv[3]), int(sys.argv[3]))
+        img_bs = int(sys.argv[4])
     else:
         image_size = (int(sys.argv[3]), int(sys.argv[4]))
+        img_bs = int(sys.argv[5])
     
-    main(engine_path, image_path, image_size)
+    main(engine_path, image_path, image_size, img_bs)
