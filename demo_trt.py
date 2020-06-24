@@ -146,7 +146,7 @@ def get_engine(engine_path):
     with open(engine_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
         return runtime.deserialize_cuda_engine(f.read())
 
-def detect(engine, context, image_src_batch, image_size, num_classes):
+def detect(engine, context, buffers, image_src, image_size, num_classes):
     IN_IMAGE_H, IN_IMAGE_W = image_size
 
     ta = time.time()

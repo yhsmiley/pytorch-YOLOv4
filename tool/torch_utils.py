@@ -76,6 +76,8 @@ def get_region_boxes(boxes_and_confs):
 def convert2cpu(gpu_matrix):
     return torch.FloatTensor(gpu_matrix.size()).copy_(gpu_matrix)
 
+def convert2cpu_long(gpu_matrix):
+    return torch.LongTensor(gpu_matrix.size()).copy_(gpu_matrix)
 
 def convert2cpu_long(gpu_matrix):
     return torch.LongTensor(gpu_matrix.size()).copy_(gpu_matrix)

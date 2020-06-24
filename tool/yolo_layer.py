@@ -37,6 +37,7 @@ def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anch
     grid_x = np.expand_dims(np.linspace(0, W - 1, W), axis=0).repeat(H, 0).reshape(1, 1, H * W).repeat(batch, 0).repeat(num_anchors, 1)
     grid_y = np.expand_dims(np.linspace(0, H - 1, H), axis=1).repeat(W, 1).reshape(1, 1, H * W).repeat(batch, 0).repeat(num_anchors, 1)
     # Shape: [batch, num_anchors, H * W]
+
     grid_x_tensor = torch.tensor(grid_x, device=device, dtype=output_dtype)
     grid_y_tensor = torch.tensor(grid_y, device=device, dtype=output_dtype)
 
@@ -278,7 +279,6 @@ class YoloLayer(nn.Module):
         self.model_out = model_out
 
     def forward(self, output, target=None):
-        
         masked_anchors = []
         for m in self.anchor_mask:
             masked_anchors += self.anchors[m * self.anchor_step:(m + 1) * self.anchor_step]
