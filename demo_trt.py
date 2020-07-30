@@ -166,7 +166,11 @@ def detect(engine, context, buffers, image_src, image_size, num_classes):
         these_imgs = img_in[i:i+engine.max_batch_size]
         batches.append(these_imgs)
 
+    # old
     trt_output_list = []
+    # new
+    # trt_output0_list = []
+    # trt_output1_list = []
     for batch in batches:
         trt_buffers = allocate_buffers(engine)
         inputs, outputs, bindings, stream = trt_buffers
@@ -175,23 +179,47 @@ def detect(engine, context, buffers, image_src, image_size, num_classes):
         trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
         print('Len of outputs: ', len(trt_outputs))
 
+        # old
         # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
         trt_output = trt_outputs[0].reshape(-1, 22743, 4 + num_classes)
         print('trt output shape: {}'.format(trt_output.shape))
         trt_output = trt_output[:len(batch)]
         trt_output_list.append(trt_output)
 
+        # new
+        # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
+        # trt_outputs[0] = trt_outputs[0].reshape(1, -1, 1, 4)
+        # trt_outputs[1] = trt_outputs[1].reshape(1, -1, num_classes)
+        # print('trt_outputs[0] shape: {}'.format(trt_outputs[0].shape))
+        # print('trt_outputs[1] shape: {}'.format(trt_outputs[1].shape))
+        # trt_output0 = trt_outputs[0][:len(batch)]
+        # trt_output0_list.append(trt_output0)
+        # trt_output1 = trt_outputs[1][:len(batch)]
+        # trt_output1_list.append(trt_output1)
+
+    # old
     trt_output_list = np.concatenate(trt_output_list, axis=0)
 
     tb = time.time()
 
     print('trt shape: {}'.format(trt_output_list.shape))
 
+    boxes = post_processing(img_in, 0.5, 0.4, trt_output_list)
+
+    # new
+    # trt_output0_list = np.concatenate(trt_output0_list, axis=0)
+    # trt_output1_list = np.concatenate(trt_output1_list, axis=0)
+
+    # tb = time.time()
+
+    # print('trt 0 shape: {}'.format(trt_output0_list.shape))
+    # print('trt 1 shape: {}'.format(trt_output1_list.shape))
+
+    # boxes = post_processing(img_in, 0.5, 0.4, trt_outputs)
+
     print('-----------------------------------')
     print('    TRT inference time: %f' % (tb - ta))
     print('-----------------------------------')
-
-    boxes = post_processing(img_in, 0.5, 0.4, trt_output_list)
 
     return boxes
 
