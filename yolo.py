@@ -262,17 +262,6 @@ class YOLOV4(object):
             l_max_conf = max_conf[i, argwhere]
             l_max_id = max_id[i, argwhere]
 
-            # keep = self._nms_cpu(l_box_array, l_max_conf)
-            
-            # bboxes = []
-            # if (keep.size > 0):
-            #     l_box_array = l_box_array[keep, :]
-            #     l_max_conf = l_max_conf[keep]
-            #     l_max_id = l_max_id[keep]
-
-            #     for j in range(l_box_array.shape[0]):
-            #         bboxes.append([l_box_array[j, 0], l_box_array[j, 1], l_box_array[j, 2], l_box_array[j, 3], l_max_conf[j], l_max_conf[j], l_max_id[j]])
-
             bboxes = []
             # nms for each class
             for j in range(num_classes):
@@ -375,7 +364,7 @@ if __name__ == '__main__':
         bb, score, class_ = det 
         l,t,r,b = bb
         cv2.rectangle(draw_frame, (l,t), (r,b), (255,255,0), 1)
-        cv2.putText(draw_frame, class_, (l, t-8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,0))
+        cv2.putText(draw_frame, class_, (l, t-8), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0))
     
     cv2.imwrite('test_out.jpg', draw_frame)
     cv2.imshow('output', draw_frame)

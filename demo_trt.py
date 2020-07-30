@@ -179,22 +179,19 @@ def detect(engine, context, image_src_batch, image_size, num_classes):
         # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
         trt_outputs[0] = trt_outputs[0].reshape(engine.max_batch_size, -1, 1, 4)
         trt_outputs[1] = trt_outputs[1].reshape(engine.max_batch_size, -1, num_classes)
-        # print('trt_outputs[0] shape: {}'.format(trt_outputs[0].shape))
-        # print('trt_outputs[1] shape: {}'.format(trt_outputs[1].shape))
         trt_output0 = trt_outputs[0][:len(batch)]
-        # print('trt_output0 shape: {}'.format(trt_output0.shape))
-        trt_boxes.append(trt_output0)
         trt_output1 = trt_outputs[1][:len(batch)]
+        # print('trt_output0 shape: {}'.format(trt_output0.shape))
         # print('trt_output1 shape: {}'.format(trt_output1.shape))
+        trt_boxes.append(trt_output0)
         trt_confs.append(trt_output1)
 
     trt_boxes = np.concatenate(trt_boxes, axis=0)
     trt_confs = np.concatenate(trt_confs, axis=0)
-
-    tb = time.time()
-
     # print('trt 0 shape: {}'.format(trt_boxes.shape))
     # print('trt 1 shape: {}'.format(trt_confs.shape))
+
+    tb = time.time()
 
     output = [trt_boxes, trt_confs]
 

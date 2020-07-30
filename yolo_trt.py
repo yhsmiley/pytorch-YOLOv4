@@ -376,7 +376,7 @@ if __name__ == '__main__':
         bb, score, class_ = det 
         l,t,r,b = bb
         cv2.rectangle(draw_frame, (l,t), (r,b), (255,255,0), 1)
-        cv2.putText(draw_frame, class_, (l, t-8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,0))
+        cv2.putText(draw_frame, class_, (l, t-8), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0))
     
     cv2.imwrite('test_out.jpg', draw_frame)
     cv2.imshow('', draw_frame)
