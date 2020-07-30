@@ -474,7 +474,7 @@ if __name__ == "__main__":
         namesfile = int(sys.argv[6])
     else:
         print('Usage: ')
-        print('  python models.py num_classes weightfile imgfile namefile')
+        print('  python models.py <num_classes> <weightfile> <imgfile> <IN_IMAGE_H> <IN_IMAGE_W> <namefile(optional)>')
 
     model = Yolov4(yolov4conv137weight=None, n_classes=n_classes, inference=True)
 

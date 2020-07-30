@@ -11,7 +11,7 @@ else:
     from pytorch_YOLOv4.tool.torch_utils import *
 
 
-def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anchors, only_objectness=1, validation=False):
+def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anchors, scale_x_y, only_objectness=1, validation=False):
     # Output would be invalid if it does not satisfy this assert
     # assert (output.size(1) == (5 + num_classes) * num_anchors)
 
@@ -25,7 +25,8 @@ def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anch
     H = output.size(2)
     W = output.size(3)
 
-    output_dtype = output.dtype
+    # output_dtype = output.dtype
+    output_dtype = torch.float32
 
     device = None
     cuda_check = output.is_cuda
@@ -52,6 +53,7 @@ def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anch
     normal_array = normal_array.repeat(num_anchors * H * W, 1)
     # Shape: [batch, num_anchors * H * W, 4]
     normal_tensor = torch.tensor(normal_array, device=device, dtype=output_dtype)
+    normal_tensor = normal_tensor.unsqueeze(2)
 
     bxy_list = []
     bwh_list = []
@@ -86,7 +88,8 @@ def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anch
 
     # Apply sigmoid(), exp() and softmax() to slices
     #
-    bxy = torch.sigmoid(bxy)
+    # bxy = torch.sigmoid(bxy)
+    bxy = torch.sigmoid(bxy) * scale_x_y - 0.5 * (scale_x_y - 1)
     bwh = torch.exp(bwh)
     det_confs = torch.sigmoid(det_confs)
     cls_confs = torch.nn.Softmax(dim=2)(cls_confs)
@@ -104,7 +107,7 @@ def yolo_forward_alternative(output, conf_thresh, num_classes, anchors, num_anch
     bwh *= anchor_tensor
 
     bx1y1 = bxy - bwh * 0.5
-    bx2y2 = bxy + bwh
+    bx2y2 = bxy + bwh * 0.5
 
     # Shape: [batch, num_anchors, 4, H * W] --> [batch, num_anchors * H * W, 1, 4]
     boxes = torch.cat((bx1y1, bx2y2), dim=2).permute(0, 1, 3, 2).reshape(batch, num_anchors * H * W, 1, 4)
@@ -136,6 +139,9 @@ def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, scale_x
     batch = output.size(0)
     H = output.size(2)
     W = output.size(3)
+
+    # output_dtype = output.dtype
+    output_dtype = torch.float32
 
     bxy_list = []
     bwh_list = []
@@ -201,13 +207,21 @@ def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, scale_x
     for i in range(num_anchors):
         ii = i * 2
         # Shape: [batch, 1, H, W]
-        bx = bxy[:, ii : ii + 1] + torch.tensor(grid_x, device=device, dtype=torch.float32) # grid_x.to(device=device, dtype=torch.float32)
+        # grid_x.to(device=device, dtype=torch.float32)
+        # bx = bxy[:, ii : ii + 1] + torch.tensor(grid_x, device=device, dtype=torch.float32)
+        bx = bxy[:, ii: ii + 1] + torch.tensor(grid_x, device=device, dtype=output_dtype)
         # Shape: [batch, 1, H, W]
-        by = bxy[:, ii + 1 : ii + 2] + torch.tensor(grid_y, device=device, dtype=torch.float32) # grid_y.to(device=device, dtype=torch.float32)
+        # grid_y.to(device=device, dtype=torch.float32)
+        # by = bxy[:, ii + 1 : ii + 2] + torch.tensor(grid_y, device=device, dtype=torch.float32)
+        by = bxy[:, ii + 1 : ii + 2] + torch.tensor(grid_y, device=device, dtype=output_dtype)
         # Shape: [batch, 1, H, W]
         bw = bwh[:, ii : ii + 1] * anchor_w[i]
+        # bw = bw.to(dtype=torch.float32)
+        bw = bw.to(dtype=output_dtype)
         # Shape: [batch, 1, H, W]
         bh = bwh[:, ii + 1 : ii + 2] * anchor_h[i]
+        # bh = bh.to(dtype=torch.float32)
+        bh = bh.to(dtype=output_dtype)
 
         bx_list.append(bx)
         by_list.append(by)
@@ -297,4 +311,4 @@ class YoloLayer(nn.Module):
         masked_anchors = [anchor / self.stride for anchor in masked_anchors]
 
         return yolo_forward(output, self.thresh, self.num_classes, masked_anchors, len(self.anchor_mask), scale_x_y=self.scale_x_y)
-        # return yolo_forward_alternative(output, self.thresh, self.num_classes, masked_anchors, len(self.anchor_mask))
+        # return yolo_forward_alternative(output, self.thresh, self.num_classes, masked_anchors, len(self.anchor_mask), scale_x_y=self.scale_x_y)

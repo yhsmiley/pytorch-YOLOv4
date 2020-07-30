@@ -146,7 +146,7 @@ def get_engine(engine_path):
     with open(engine_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
         return runtime.deserialize_cuda_engine(f.read())
 
-def detect(engine, context, buffers, image_src, image_size, num_classes):
+def detect(engine, context, image_src_batch, image_size, num_classes):
     IN_IMAGE_H, IN_IMAGE_W = image_size
 
     ta = time.time()
@@ -166,11 +166,8 @@ def detect(engine, context, buffers, image_src, image_size, num_classes):
         these_imgs = img_in[i:i+engine.max_batch_size]
         batches.append(these_imgs)
 
-    # old
-    trt_output_list = []
-    # new
-    # trt_output0_list = []
-    # trt_output1_list = []
+    trt_boxes = []
+    trt_confs = []
     for batch in batches:
         trt_buffers = allocate_buffers(engine)
         inputs, outputs, bindings, stream = trt_buffers
@@ -179,43 +176,29 @@ def detect(engine, context, buffers, image_src, image_size, num_classes):
         trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
         print('Len of outputs: ', len(trt_outputs))
 
-        # old
         # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
-        trt_output = trt_outputs[0].reshape(-1, 22743, 4 + num_classes)
-        print('trt output shape: {}'.format(trt_output.shape))
-        trt_output = trt_output[:len(batch)]
-        trt_output_list.append(trt_output)
-
-        # new
-        # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
-        # trt_outputs[0] = trt_outputs[0].reshape(1, -1, 1, 4)
-        # trt_outputs[1] = trt_outputs[1].reshape(1, -1, num_classes)
+        trt_outputs[0] = trt_outputs[0].reshape(engine.max_batch_size, -1, 1, 4)
+        trt_outputs[1] = trt_outputs[1].reshape(engine.max_batch_size, -1, num_classes)
         # print('trt_outputs[0] shape: {}'.format(trt_outputs[0].shape))
         # print('trt_outputs[1] shape: {}'.format(trt_outputs[1].shape))
-        # trt_output0 = trt_outputs[0][:len(batch)]
-        # trt_output0_list.append(trt_output0)
-        # trt_output1 = trt_outputs[1][:len(batch)]
-        # trt_output1_list.append(trt_output1)
+        trt_output0 = trt_outputs[0][:len(batch)]
+        # print('trt_output0 shape: {}'.format(trt_output0.shape))
+        trt_boxes.append(trt_output0)
+        trt_output1 = trt_outputs[1][:len(batch)]
+        # print('trt_output1 shape: {}'.format(trt_output1.shape))
+        trt_confs.append(trt_output1)
 
-    # old
-    trt_output_list = np.concatenate(trt_output_list, axis=0)
+    trt_boxes = np.concatenate(trt_boxes, axis=0)
+    trt_confs = np.concatenate(trt_confs, axis=0)
 
     tb = time.time()
 
-    print('trt shape: {}'.format(trt_output_list.shape))
+    # print('trt 0 shape: {}'.format(trt_boxes.shape))
+    # print('trt 1 shape: {}'.format(trt_confs.shape))
 
-    boxes = post_processing(img_in, 0.5, 0.4, trt_output_list)
+    output = [trt_boxes, trt_confs]
 
-    # new
-    # trt_output0_list = np.concatenate(trt_output0_list, axis=0)
-    # trt_output1_list = np.concatenate(trt_output1_list, axis=0)
-
-    # tb = time.time()
-
-    # print('trt 0 shape: {}'.format(trt_output0_list.shape))
-    # print('trt 1 shape: {}'.format(trt_output1_list.shape))
-
-    # boxes = post_processing(img_in, 0.5, 0.4, trt_outputs)
+    boxes = post_processing(img_in, 0.5, 0.4, output)
 
     print('-----------------------------------')
     print('    TRT inference time: %f' % (tb - ta))

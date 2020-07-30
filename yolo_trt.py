@@ -26,7 +26,7 @@ class HostDeviceMem(object):
 class YOLOV4(object):
     if CWD == THIS_DIR:
         _defaults = {
-            "engine_path": "trt_weights/yolov4_1_3_608_608_sim.trt",
+            "engine_path": "trt_weights/yolov4_1_3_608_608.trt",
             "classes_path": 'data/coco.names',
             "thresh": 0.5,
             "nms_thresh": 0.4,
@@ -34,7 +34,7 @@ class YOLOV4(object):
         }
     else:
         _defaults = {
-            "engine_path": "pytorch_YOLOv4/trt_weights/yolov4_1_3_608_608_sim.trt",
+            "engine_path": "pytorch_YOLOv4/trt_weights/yolov4_1_3_608_608.trt",
             "classes_path": 'pytorch_YOLOv4/data/coco.names',
             "thresh": 0.5,
             "nms_thresh": 0.4,
@@ -55,6 +55,7 @@ class YOLOV4(object):
         self.max_batch_size = self.trt_engine.max_batch_size
 
         self.class_names = self._get_class()
+        self.num_classes = len(self.class_names)
         self.bgr = bgr
 
         # warm up
@@ -126,7 +127,8 @@ class YOLOV4(object):
             these_imgs = images[i:i+self.max_batch_size]
             batches.append(these_imgs)
 
-        feature_list = []
+        trt_boxes = []
+        trt_confs = []
         for batch in batches:
             self.trt_buffers = self.allocate_buffers(self.trt_engine)
             inputs, outputs, bindings, stream = self.trt_buffers
@@ -134,14 +136,22 @@ class YOLOV4(object):
 
             trt_outputs = self.trt_inference(self.trt_context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
             # (19*19 + 38*38 + 76*76) * 3 = 22743 for 608x608
-            features = trt_outputs[0].reshape(-1, 22743, 4 + len(self.class_names))
-            features = features[:len(batch)]
+            # features = trt_outputs[0].reshape(-1, 22743, 4 + len(self.class_names))
+            # features = features[:len(batch)]
+            trt_outputs[0] = trt_outputs[0].reshape(self.max_batch_size, -1, 1, 4)
+            trt_outputs[1] = trt_outputs[1].reshape(self.max_batch_size, -1, self.num_classes)
 
-            feature_list.append(features)
+            # feature_list.append(trt_outputs)
+            trt_boxes.append(trt_outputs[0][:len(batch)])
+            trt_confs.append(trt_outputs[1][:len(batch)])
 
-        feature_list = np.concatenate(feature_list, axis=0)
+        # output = np.concatenate(feature_list, axis=0)
+        trt_boxes = np.concatenate(trt_boxes, axis=0)
+        trt_confs = np.concatenate(trt_confs, axis=0)
 
-        return self._post_processing(feature_list)
+        output = [trt_boxes, trt_confs]
+
+        return self._post_processing(output)
 
     def detect_get_box_in(self, images, box_format='ltrb', classes=None, buffer_ratio=0.0):
         '''
@@ -215,12 +225,10 @@ class YOLOV4(object):
                 if classes is not None and cls_name not in classes:
                     continue
 
-                left = int((box[0] - box[2] / 2.0) * im_width)
-                top = int((box[1] - box[3] / 2.0) * im_height)
-                right = int((box[0] + box[2] / 2.0) * im_width)
-                bottom = int((box[1] + box[3] / 2.0) * im_height)
-                w = int(right - left)
-                h = int(bottom - top)
+                left = int(box[0] * im_width)
+                top = int(box[1] * im_height)
+                right = int(box[2] * im_width)
+                bottom = int(box[3] * im_height)
                 
                 width = right - left + 1
                 height = bottom - top + 1
@@ -263,11 +271,17 @@ class YOLOV4(object):
         # strides = [8, 16, 32]
         # anchor_step = len(anchors) // num_anchors
 
-        # [batch, num, 4]
-        box_array = output[:, :, :4]
-
+        # [batch, num, 1, 4]
+        box_array = output[0]
         # [batch, num, num_classes]
-        confs = output[:, :, 4:]
+        confs = output[1]
+
+        if type(box_array).__name__ != 'ndarray':
+            box_array = box_array.cpu().detach().numpy()
+            confs = confs.cpu().detach().numpy()
+
+        # [batch, num, 4]
+        box_array = box_array[:, :, 0]
 
         # [batch, num, num_classes] --> [batch, num]
         max_conf = np.max(confs, axis=2)
@@ -299,8 +313,8 @@ class YOLOV4(object):
     def _nms_cpu(self, boxes, confs, min_mode=False):
         x1 = boxes[:, 0]
         y1 = boxes[:, 1]
-        x2 = boxes[:, 0] + boxes[:, 2]
-        y2 = boxes[:, 1] + boxes[:, 3]
+        x2 = boxes[:, 2]
+        y2 = boxes[:, 3]
 
         areas = (x2 - x1) * (y2 - y1)
         order = confs.argsort()[::-1]
@@ -340,9 +354,9 @@ if __name__ == '__main__':
     bs = 5
     imgs = [ img for _ in range(bs) ]
 
-    yolov4 = YOLOV4( 
-      score=0.5, 
-      bgr=True
+    yolov4 = YOLOV4(
+        score=0.5, 
+        bgr=True
     )
 
     n = 10
@@ -361,7 +375,8 @@ if __name__ == '__main__':
         # print(det)
         bb, score, class_ = det 
         l,t,r,b = bb
-        cv2.rectangle(draw_frame, (l,t), (r,b), (255,255,0), 1 )
+        cv2.rectangle(draw_frame, (l,t), (r,b), (255,255,0), 1)
+        cv2.putText(draw_frame, class_, (l, t-8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,0))
     
     cv2.imwrite('test_out.jpg', draw_frame)
     cv2.imshow('', draw_frame)

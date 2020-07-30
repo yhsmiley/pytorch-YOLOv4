@@ -2,8 +2,9 @@
 
 ## Setup
 
-- in tool/yolo_layer.py, change last line from yolo_forward_alternative to yolo_forward (RMB TO CHANGE BACK AFTER FINISH CONVERTING)
-- start docker
+- get tensorrt 7.0 for ubuntu 18.04, cuda 10.0 using ./get_trt.sh
+- build docker with tensorrt.Dockerfile
+- start docker with ./start_docker.sh
 
 ## Conversion from PyTorch to ONNX
 
@@ -11,11 +12,15 @@
 python3 demo_pytorch2onnx.py weights/yolov4.pth <image_path> <batch_size> 80 <IN_IMAGE_H> <IN_IMAGE_W>
 ```
 
+- Optionally, use onnxsim to simplify the onnx model (it works even without simplification, putting it here for future reference)<br>
+
 With batch_size=1, IN_IMAGE_H=608, IN_IMAGE_W=608:
 ```
-python3 -m onnxsim yolov4_1_3_608_608.onnx yolov4_1_3_608_608_sim.onnx
+python3 -m onnxsim yolov4_1_3_608_608.onnx yolov4_1_3_608_608.onnx
+```
 
-cp yolov4_1_3_608_608_sim.onnx /usr/src/tensorrt/bin
+```
+cp yolov4_1_3_608_608.onnx /usr/src/tensorrt/bin
 ```
 
 ## Conversion from ONNX to TensorRT
@@ -23,9 +28,9 @@ cp yolov4_1_3_608_608_sim.onnx /usr/src/tensorrt/bin
 ```
 cd /usr/src/tensorrt/bin/
 
-./trtexec --onnx=yolov4_1_3_608_608_sim.onnx --maxBatch=1 --saveEngine=yolov4_1_3_608_608_sim.trt --fp16 --verbose
+./trtexec --onnx=yolov4_1_3_608_608.onnx --maxBatch=1 --saveEngine=yolov4_1_3_608_608.trt --fp16 --verbose
 
-cp yolov4_1_3_608_608_sim.trt /retinaface_rose/pytorch_YOLOv4/trt_weights/
+cp yolov4_1_3_608_608.trt /pytorch_YOLOv4/trt_weights/
 ```
 
 *NOTE:* maxBatch should be the same as onnx batch size -> if value is higher than onnx batch size, no error but inference will be wrong
@@ -33,9 +38,9 @@ cp yolov4_1_3_608_608_sim.trt /retinaface_rose/pytorch_YOLOv4/trt_weights/
 ## Run
 
 ``` 
-cd /retinaface_rose/pytorch_YOLOv4/
+cd /pytorch_YOLOv4/
 
-python3 demo_trt.py trt_weights/yolov4_1_3_608_608_sim.trt <image_path> 608 608 <img_bs>
+python3 demo_trt.py trt_weights/yolov4_1_3_608_608.trt <image_path> 608 608 <img_bs>
 ```
 
 ## Notes
