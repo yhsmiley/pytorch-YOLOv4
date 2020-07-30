@@ -26,7 +26,7 @@ class HostDeviceMem(object):
 class YOLOV4(object):
     if CWD == THIS_DIR:
         _defaults = {
-            "engine_path": "trt_weights/yolov4_1_3_608_608.trt",
+            "engine_path": "trt_weights/yolov4_1_608_608.trt",
             "classes_path": 'data/coco.names',
             "thresh": 0.5,
             "nms_thresh": 0.4,
@@ -34,7 +34,7 @@ class YOLOV4(object):
         }
     else:
         _defaults = {
-            "engine_path": "pytorch_YOLOv4/trt_weights/yolov4_1_3_608_608.trt",
+            "engine_path": "pytorch_YOLOv4/trt_weights/yolov4_1_608_608.trt",
             "classes_path": 'pytorch_YOLOv4/data/coco.names',
             "thresh": 0.5,
             "nms_thresh": 0.4,

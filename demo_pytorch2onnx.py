@@ -21,7 +21,7 @@ def transform_to_onnx(weight_file, batch_size, n_classes, IN_IMAGE_H, IN_IMAGE_W
 
     x = torch.randn((batch_size, 3, IN_IMAGE_H, IN_IMAGE_W), requires_grad=True)  # .cuda()
 
-    onnx_file_name = "yolov4_{}_3_{}_{}.onnx".format(batch_size, IN_IMAGE_H, IN_IMAGE_W)
+    onnx_file_name = "yolov4_{}_{}_{}.onnx".format(batch_size, IN_IMAGE_H, IN_IMAGE_W)
 
     # Export the model
     print('Export the onnx model ...')

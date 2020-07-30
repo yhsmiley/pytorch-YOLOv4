@@ -16,11 +16,11 @@ python3 demo_pytorch2onnx.py weights/yolov4.pth <image_path> <batch_size> 80 <IN
 
 With batch_size=1, IN_IMAGE_H=608, IN_IMAGE_W=608:
 ```
-python3 -m onnxsim yolov4_1_3_608_608.onnx yolov4_1_3_608_608.onnx
+python3 -m onnxsim yolov4_1_608_608.onnx yolov4_1_608_608.onnx
 ```
 
 ```
-cp yolov4_1_3_608_608.onnx /usr/src/tensorrt/bin
+cp yolov4_1_608_608.onnx /usr/src/tensorrt/bin
 ```
 
 ## Conversion from ONNX to TensorRT
@@ -28,9 +28,9 @@ cp yolov4_1_3_608_608.onnx /usr/src/tensorrt/bin
 ```
 cd /usr/src/tensorrt/bin/
 
-./trtexec --onnx=yolov4_1_3_608_608.onnx --maxBatch=1 --saveEngine=yolov4_1_3_608_608.trt --fp16 --verbose
+./trtexec --onnx=yolov4_1_608_608.onnx --maxBatch=1 --saveEngine=yolov4_1_608_608.trt --fp16 --verbose
 
-cp yolov4_1_3_608_608.trt /pytorch_YOLOv4/trt_weights/
+cp yolov4_1_608_608.trt /pytorch_YOLOv4/trt_weights/
 ```
 
 *NOTE:* maxBatch should be the same as onnx batch size -> if value is higher than onnx batch size, no error but inference will be wrong
@@ -40,7 +40,7 @@ cp yolov4_1_3_608_608.trt /pytorch_YOLOv4/trt_weights/
 ``` 
 cd /pytorch_YOLOv4/
 
-python3 demo_trt.py trt_weights/yolov4_1_3_608_608.trt <image_path> 608 608 <img_bs>
+python3 demo_trt.py trt_weights/yolov4_1_608_608.trt <image_path> 608 608 <img_bs>
 ```
 
 ## Notes
