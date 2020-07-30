@@ -33,7 +33,12 @@ cd /usr/src/tensorrt/bin/
 cp yolov4_1_608_608.trt /pytorch_YOLOv4/trt_weights/
 ```
 
-*NOTE:* maxBatch should be the same as onnx batch size -> if value is higher than onnx batch size, no error but inference will be wrong
+*NOTE:*
+- maxBatch should be the same as onnx batch size -> if value is higher than onnx batch size, no error but inference will be wrong
+- If use --explicitBatch instead of --maxBatch, the trt engine max_batch_size will always be 1
+- Choosing the Optimal Workspace Size:
+    - At runtime, the space is allocated automatically when creating an IExecutionContext. The amount allocated will be no more than is required, even if the amount set in IBuilder::setMaxWorkspaceSize() is much higher.
+    - Applications should therefore allow the TensorRT builder as much workspace as they can afford; at runtime TensorRT will allocate no more than this, and typically less.
 
 ## Run
 
@@ -46,4 +51,3 @@ python3 demo_trt.py trt_weights/yolov4_1_608_608.trt <image_path> 608 608 <img_b
 ## Notes
 
 - Right now only works for static image sizes
-- If use explicitBatch in trtexec, the trt engine max_batch_size will always be 1
