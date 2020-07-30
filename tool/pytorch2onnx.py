@@ -13,7 +13,7 @@ def transform_to_onnx(cfgfile, weightfile, batch_size=1, dynamic=False):
 
     x = torch.randn((batch_size, 3, model.height, model.width), requires_grad=True)  # .cuda()
 
-    if dynamics:
+    if dynamic:
         onnx_file_name = "yolov4_{}_3_{}_{}_dyna.onnx".format(batch_size, model.height, model.width)
         input_names = ["input"]
         output_names = ['boxes', 'confs']
