@@ -1,5 +1,9 @@
 # Pytorch-YOLOv4
 
+## Adapted/Forked from [Tianxiaomo's repo](https://github.com/Tianxiaomo/pytorch-YOLOv4) 
+Last "merge" date: 30th August 2020
+
+## README
 ![](https://img.shields.io/static/v1?label=python&message=3.6|3.7&color=blue)
 ![](https://img.shields.io/static/v1?label=pytorch&message=1.4&color=<COLOR>)
 [![](https://img.shields.io/static/v1?label=license&message=Apache2&color=green)](./License.txt)
