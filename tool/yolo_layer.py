@@ -1,7 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-<<<<<<< HEAD
 import os
 from pathlib import Path
 yolov4_DIR = Path(os.path.dirname(os.path.realpath(__file__))).parent
